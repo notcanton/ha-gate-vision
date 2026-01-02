@@ -1,0 +1,17 @@
+{
+  "domain": "garage_door_vision",
+  "name": "Garage Door Vision",
+  "version": "1.0.0",
+  "codeowners": [
+    "@yourname"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "camera"
+  ],
+  "documentation": "https://www.home-assistant.io/integrations/garage_door_vision",
+  "iot_class": "local_polling",
+  "requirements": [
+    "opencv-python==4.11.0.86"
+  ]
+}
