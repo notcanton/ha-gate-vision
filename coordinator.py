@@ -32,29 +32,13 @@ class GarageDoorTracker:
         img_np = cv2.resize(img_np, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
         gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
 
-        import time
-
-        start_time = time.perf_counter()
         corners, ids, _ = self.detector.detectMarkers(gray)
-        end_time = time.perf_counter()
-        elapsed_time = end_time - start_time
-        _LOGGER.info(f"Execution time: {elapsed_time:.4f} seconds")
 
         if ids is not None:
-            _LOGGER.info("Detected THINGY")
             cv2.aruco.drawDetectedMarkers(img_np, corners, ids)
-            success = cv2.imwrite("frame.jpg", img_np)
-            if success:
-                _LOGGER.info("SAVED FRAME")
             for id, corner in zip(ids[0], corners[0], strict=True):
                 if id == self.id:
                     return corner[0] / [img_np.shape[1], img_np.shape[0]]
-        else:
-            _LOGGER.info("No detection")
-
-            success = cv2.imwrite("frame.jpg", img_np)
-            if success:
-                _LOGGER.info("SAVED FRAME")
 
         return None
 
