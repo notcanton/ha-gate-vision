@@ -4,9 +4,14 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.helpers.selector import selector
+from homeassistant.helpers.selector import (
+    selector,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
-from .const import CONF_BUTTON, CONF_CAMERA, DOMAIN
+from .const import CONF_BUTTON, CONF_CAMERA, DOMAIN, CONF_TRACKER_URL
 
 
 class GarageDoorVisionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -23,6 +28,9 @@ class GarageDoorVisionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_CAMERA): selector({"entity": {"domain": "camera"}}),
                 vol.Required(CONF_BUTTON): selector({"entity": {"domain": "button"}}),
+                vol.Required(CONF_TRACKER_URL): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.URL)
+                ),
             }
         )
 

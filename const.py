@@ -14,6 +14,8 @@ CONF_BUTTON = "button_entity"
 STORAGE_VERSION = 1
 STORAGE_KEY = "garage_door_vision_calibration"
 
+CONF_TRACKER_URL = "tracker_url"
+
 
 class PlannerState(Enum):
     OPEN = 1

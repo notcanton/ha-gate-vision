@@ -3,50 +3,29 @@ from __future__ import annotations
 from datetime import datetime
 import logging
 
-import cv2
 import numpy as np
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import httpx_client
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .camera_reader import get_camera_frame
-from .const import CONF_CAMERA, STORAGE_KEY, STORAGE_VERSION, PlannerState
+from .const import (
+    CONF_CAMERA,
+    CONF_TRACKER_URL,
+    STORAGE_KEY,
+    STORAGE_VERSION,
+    PlannerState,
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class GarageDoorTracker:
-    def __init__(self):
-        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
-        parameters = cv2.aruco.DetectorParameters()
-        self.detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
-        self.id = 1
-
-    def pos(self, frame: bytes | None) -> np.ndarray | None:
-        if frame is None:
-            return None
-
-        nparr = np.frombuffer(frame, np.uint8)
-        img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        img_np = cv2.resize(img_np, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
-        gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
-
-        corners, ids, _ = self.detector.detectMarkers(gray)
-
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(img_np, corners, ids)
-            for id, corner in zip(ids[0], corners[0], strict=True):
-                if id == self.id:
-                    return corner[0] / [img_np.shape[1], img_np.shape[0]]
-
-        return None
 
 
 class GarageDoorPlanner:
     THRESHOLD = 0.01
     TIMEOUT = 30
-    MIN_TIME = 5
+    MIN_TIME = 2
 
     def __init__(self):
         self.state = PlannerState.UNKNOWN
@@ -168,14 +147,33 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
         )
 
         self.camera_entity = entry.data[CONF_CAMERA]
-        self.garage_door = GarageDoorTracker()
+        self.tracker_url = entry.data[CONF_TRACKER_URL]
         self.garage_planner = GarageDoorPlanner()
+        self.id = 1
+        self.httpx_client = httpx_client.get_async_client(hass)
+
+    async def get_garage_position(self, frame: bytes | None) -> np.ndarray | None:
+        if frame is None:
+            return None
+
+        files = {"file": frame}
+        resp = await self.httpx_client.post(self.tracker_url, files=files)
+        resp.raise_for_status()
+
+        pos_data = resp.json()
+        ids = pos_data["ids"]
+
+        if ids is not None:
+            for id, corner in zip(ids[0], pos_data["corners"], strict=True):
+                if id == self.id:
+                    return corner[0]
+        return None
 
     async def _async_update_data(self):
         _LOGGER.info("HELLO WORLD")
 
         frame = await get_camera_frame(self.hass, self.camera_entity)
-        pos = self.garage_door.pos(frame)
+        pos = await self.get_garage_position(frame)
         self.garage_planner.run(pos)
 
         if pos is not None:
@@ -184,7 +182,7 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
     async def async_calibrate(self):
         _LOGGER.info("Calibrating")
         frame = await get_camera_frame(self.hass, self.camera_entity)
-        pos = self.garage_door.pos(frame)
+        pos = await self.get_garage_position(frame)
 
         if pos is None:
             _LOGGER.error("Calibration failed: no frame")

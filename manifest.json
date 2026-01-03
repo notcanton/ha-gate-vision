@@ -11,7 +11,5 @@
   ],
   "documentation": "https://www.home-assistant.io/integrations/garage_door_vision",
   "iot_class": "local_polling",
-  "requirements": [
-    "opencv-python-headless==4.11.0.86"
-  ]
+  "requirements": []
 }
