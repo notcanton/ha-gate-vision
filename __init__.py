@@ -30,6 +30,5 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
 
 async def async_unload_entry(hass, entry):
-    coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-    await coordinator.async_unload()
+    hass.data[DOMAIN].pop(entry.entry_id)
     return True
