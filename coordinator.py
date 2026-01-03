@@ -211,6 +211,7 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
 
     async def async_calibrate(self):
         _LOGGER.info("Calibrating")
+        await self._wait_for_camera_ready()
         frame = await get_camera_frame(self.hass, self.camera_entity)
         pos = await self.get_garage_position(frame)
 
@@ -221,7 +222,7 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
         calibration_data = {"close_position": pos}
         await self.store.async_save(calibration_data)
 
-        self.garage_planner.setup(calibration_data["close_position"])
+        self.garage_planner.setup(np.array(calibration_data["close_position"]))
         _LOGGER.info(f"Garage position: {pos}")
 
         return True
