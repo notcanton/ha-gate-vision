@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 import logging
 
 import numpy as np
 
-from homeassistant.core import HomeAssistant
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import httpx_client
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -169,9 +172,36 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
                     return corner[0]
         return None
 
+    async def _wait_for_camera_ready(self):
+        state = self.hass.states.get(self.camera_entity)
+        if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+
+        ready = asyncio.Event()
+
+        @callback
+        def _state_change(event):
+            if event.data["new_state"].state not in (
+                STATE_UNAVAILABLE,
+                STATE_UNKNOWN,
+            ):
+                ready.set()
+
+        remove = async_track_state_change_event(
+            self.hass,
+            [self.camera_entity],
+            _state_change,
+        )
+
+        try:
+            await asyncio.wait_for(ready.wait(), timeout=30)
+        finally:
+            remove()
+
     async def _async_update_data(self):
         _LOGGER.info("HELLO WORLD")
 
+        await self._wait_for_camera_ready()
         frame = await get_camera_frame(self.hass, self.camera_entity)
         pos = await self.get_garage_position(frame)
         self.garage_planner.run(pos)
@@ -188,7 +218,7 @@ class GarageDoorVisionCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Calibration failed: no frame")
             return False
 
-        calibration_data = {"close_position": pos.tolist()}
+        calibration_data = {"close_position": pos}
         await self.store.async_save(calibration_data)
 
         self.garage_planner.setup(calibration_data["close_position"])
